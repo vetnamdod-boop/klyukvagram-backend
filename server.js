@@ -16,5 +16,33 @@ mongoose.connect(process.env.MONGO_URI, {
 
 app.use('/api/auth', authRoutes);
 
+const Message = mongoose.model('Message', new mongoose.Schema({
+  chatId: String,
+  sender: String,
+  content: String,
+  timestamp: { type: Date, default: Date.now }
+}));
+
+app.get('/api/messages/:chatId', async (req, res) => {
+  try {
+    const messages = await Message.find({ chatId: req.params.chatId }).sort('timestamp');
+    res.status(200).json(messages);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/messages', async (req, res) => {
+  try {
+    const { chatId, sender, content } = req.body;
+    if (!chatId || !sender || !content) return res.status(400).json({ error: 'Missing fields' });
+    const message = new Message({ chatId, sender, content });
+    await message.save();
+    res.status(201).json(message);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
