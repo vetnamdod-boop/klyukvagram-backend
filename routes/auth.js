@@ -6,6 +6,7 @@ const router = express.Router();
 router.post('/register', async (req, res) => {
   try {
     const { username, password } = req.body;
+    console.log(`Registering user: ${username}`);
     if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
 
     const existingUser = await User.findOne({ username });
@@ -24,6 +25,7 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    console.log(`Logging in user: ${username}`);
     const user = await User.findOne({ username });
     if (!user) return res.status(400).json({ error: 'Invalid username or password' });
 
@@ -39,6 +41,7 @@ router.post('/login', async (req, res) => {
 
 router.get('/users', async (req, res) => {
   try {
+    console.log('Fetching all users');
     const users = await User.find({}, 'username');
     res.status(200).json(users.map(user => user.username));
   } catch (err) {
