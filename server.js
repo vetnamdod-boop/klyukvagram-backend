@@ -5,68 +5,66 @@ const authRoutes = require('./routes/auth');
 require('dotenv').config();
 
 const app = express();
-app.use(cors({ origin: '*' }));
-app.use(express.json({ limit: '10mb' }));
+app.use(cors());
+app.use(express.json());
 
-// Подключение к MongoDB
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverSelectionTimeoutMS: 5000
-}).then(() => console.log('MongoDB успешно подключен'))
-  .catch(err => console.error('Ошибка подключения MongoDB:', err.message));
+  useUnifiedTopology: true
+}).then(() => console.log('MongoDB connected'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
-// Модель сообщений
-const MessageSchema = new mongoose.Schema({
-  chatId: { type: String, required: true },
-  sender: { type: String, required: true },
-  content: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now }
-});
-const Message = mongoose.model('Message', MessageSchema);
-
-// Роуты авторизации
 app.use('/api/auth', authRoutes);
 
-// Получение сообщений
+const Message = mongoose.model('Message', new mongoose.Schema({
+  chatId: String,
+  sender: String,
+  content: String,
+  timestamp: { type: Date, default: Date.now }
+}));
+
+const responseMessages = [
+  'блюю',
+  'наблювала',
+  'карета горит',
+  'блюю на горящую карету'
+];
+
+function generateResponse(chatId) {
+  const randomIndex = Math.floor(Math.random() * (responseMessages.length + 2));
+  if (randomIndex < responseMessages.length) return responseMessages[randomIndex];
+  if (randomIndex === responseMessages.length) return `наблювала на ${chatId}`;
+  return `${chatId} умерлаааааааааааа`;
+}
+
 app.get('/api/messages/:chatId', async (req, res) => {
   try {
-    console.log(`Запрос сообщений для chatId: ${req.params.chatId}`);
-    const messages = await Message.find({ chatId: req.params.chatId })
-      .sort({ timestamp: 1 })
-      .limit(100);
-    console.log(`Найдено ${messages.length} сообщений`);
+    const messages = await Message.find({ chatId: req.params.chatId }).sort('timestamp');
     res.status(200).json(messages);
   } catch (err) {
-    console.error('Ошибка получения сообщений:', err.message);
-    res.status(500).json({ error: 'Ошибка сервера при получении сообщений' });
+    console.error('Error fetching messages:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Отправка сообщения
 app.post('/api/messages', async (req, res) => {
   try {
     const { chatId, sender, content } = req.body;
-    console.log(`Получено сообщение: chatId=${chatId}, sender=${sender}, content=${content}`);
-    if (!chatId || !sender || !content) {
-      console.warn('Недостаточно данных в запросе');
-      return res.status(400).json({ error: 'Требуются chatId, sender и content' });
-    }
+    if (!chatId || !sender || !content) return res.status(400).json({ error: 'Missing fields' });
     const message = new Message({ chatId, sender, content });
     await message.save();
-    console.log('Сообщение сохранено:', message);
+
+    // Автоматический ответ
+    const responseContent = generateResponse(chatId);
+    const responseMessage = new Message({ chatId, sender: chatId, content: responseContent });
+    await responseMessage.save();
+
     res.status(201).json(message);
   } catch (err) {
-    console.error('Ошибка сохранения сообщения:', err.message);
-    res.status(500).json({ error: 'Ошибка сервера при сохранении сообщения' });
+    console.error('Error saving message:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
-// Тестовый эндпоинт
-app.get('/api/health', (req, res) => {
-  console.log('Проверка состояния сервера');
-  res.status(200).json({ status: 'Сервер работает', timestamp: new Date() });
-});
-
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Сервер запущен на порту ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
