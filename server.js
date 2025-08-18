@@ -1,82 +1,52 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const dotenv = require('dotenv');
-
-dotenv.config();
+const authRoutes = require('./routes/auth');
+require('dotenv').config();
 
 const app = express();
-
-// Разрешаем CORS для всех источников (для простоты) или конкретного домена Unity WebGL
-app.use(cors({
-    origin: ['https://klyukvagram-frontend.vercel.app', 'http://localhost:3000'], // Укажи домен фронтенда
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
-
+app.use(cors());
 app.use(express.json());
 
 mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
+  useNewUrlParser: true,
+  useUnifiedTopology: true
 }).then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Схема пользователя
-const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true }
+app.use('/api/auth', authRoutes);
+
+const Message = mongoose.model('Message', new mongoose.Schema({
+  chatId: String,
+  sender: String,
+  content: String,
+  timestamp: { type: Date, default: Date.now }
+}));
+
+app.get('/api/messages/:chatId', async (req, res) => {
+  try {
+    console.log(`Fetching messages for chatId: ${req.params.chatId}`);
+    const messages = await Message.find({ chatId: req.params.chatId }).sort('timestamp');
+    res.status(200).json(messages);
+  } catch (err) {
+    console.error('Error fetching messages:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
-const User = mongoose.model('User', userSchema);
-
-// Регистрация
-app.post('/api/auth/register', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        if (!username || !password) {
-            return res.status(400).json({ error: 'Username and password are required' });
-        }
-        const existingUser = await User.findOne({ username });
-        if (existingUser) {
-            return res.status(400).json({ error: 'Username already exists' });
-        }
-        const user = new User({ username, password });
-        await user.save();
-        console.log(`User registered: ${username}`);
-        res.status(201).json({ message: 'User registered successfully' });
-    } catch (error) {
-        console.error('Registration error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// Логин
-app.post('/api/auth/login', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        const user = await User.findOne({ username });
-        if (!user || user.password !== password) {
-            return res.status(400).json({ error: 'Invalid credentials' });
-        }
-        res.json({ message: 'Login successful' });
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// Получение списка пользователей
-app.get('/api/auth/users', async (req, res) => {
-    try {
-        const users = await User.find({}, 'username');
-        res.json(users);
-    } catch (error) {
-        console.error('Users fetch error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
+app.post('/api/messages', async (req, res) => {
+  try {
+    const { chatId, sender, content } = req.body;
+    console.log(`Saving message: chatId=${chatId}, sender=${sender}, content=${content}`);
+    if (!chatId || !sender || !content) return res.status(400).json({ error: 'Missing fields' });
+    const message = new Message({ chatId, sender, content });
+    await message.save();
+    res.status(201).json(message);
+  } catch (err) {
+    console.error('Error saving message:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`));
