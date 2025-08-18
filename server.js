@@ -23,20 +23,6 @@ const Message = mongoose.model('Message', new mongoose.Schema({
   timestamp: { type: Date, default: Date.now }
 }));
 
-const responseMessages = [
-  'блюю',
-  'наблювала',
-  'карета горит',
-  'блюю на горящую карету'
-];
-
-function generateResponse(chatId) {
-  const randomIndex = Math.floor(Math.random() * (responseMessages.length + 2));
-  if (randomIndex < responseMessages.length) return responseMessages[randomIndex];
-  if (randomIndex === responseMessages.length) return `наблювала на ${chatId}`;
-  return `${chatId} умерлаааааааааааа`;
-}
-
 app.get('/api/messages/:chatId', async (req, res) => {
   try {
     const messages = await Message.find({ chatId: req.params.chatId }).sort('timestamp');
@@ -53,12 +39,6 @@ app.post('/api/messages', async (req, res) => {
     if (!chatId || !sender || !content) return res.status(400).json({ error: 'Missing fields' });
     const message = new Message({ chatId, sender, content });
     await message.save();
-
-    // Автоматический ответ
-    const responseContent = generateResponse(chatId);
-    const responseMessage = new Message({ chatId, sender: chatId, content: responseContent });
-    await responseMessage.save();
-
     res.status(201).json(message);
   } catch (err) {
     console.error('Error saving message:', err);
