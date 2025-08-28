@@ -1,0 +1,5 @@
+Flask==2.3.3
+flask-cors==4.0.0
+requests==2.31.0
+PyGithub==1.58.2
+gunicorn==21.2.0
